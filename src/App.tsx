@@ -12,8 +12,7 @@ import {
   ShieldCheck,
   TrendingUp,
   Cpu,
-  Menu,
-  X
+  Menu
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MetricCard from './components/MetricCard';
