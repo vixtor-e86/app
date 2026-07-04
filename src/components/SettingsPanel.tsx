@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Save, Shield, Power, ShieldAlert } from 'lucide-react';
-import { MeterSettings } from '../lib/supabase';
+import type { MeterSettings } from '../lib/supabase';
 
 interface SettingsPanelProps {
   activeSensorId: number;

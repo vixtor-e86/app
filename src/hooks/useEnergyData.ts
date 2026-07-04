@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase, MeterReading, MeterSettings } from '../lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import type { MeterReading, MeterSettings } from '../lib/supabase';
 
 export interface EnergyData {
   voltage: number;
