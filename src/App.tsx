@@ -199,7 +199,7 @@ export default function App() {
                             {reading ? `${Math.round(reading.power)} W` : '0 W'}
                           </div>
                           <div className="text-[10px] text-[#8A8A9E] mt-1 font-mono">
-                            {reading ? `${reading.voltage.toFixed(1)}V | ${reading.current.toFixed(2)}A` : 'No readings received'}
+                            {reading ? `${reading.voltage.toFixed(1)}V | ${reading.current.toFixed(2)}A | ${reading.frequency.toFixed(1)}Hz` : 'No readings received'}
                           </div>
                         </div>
                       </button>
@@ -208,7 +208,7 @@ export default function App() {
                 </div>
 
                 {/* Selected Channel Metrics Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <MetricCard
                     label="Voltage"
                     value={data.voltage}
@@ -238,6 +238,13 @@ export default function App() {
                     unit="kWh"
                     icon={<Battery size={20} />}
                     color="#00FF9D"
+                  />
+                  <MetricCard
+                    label="Frequency"
+                    value={data.frequency}
+                    unit="Hertz (Hz)"
+                    icon={<Activity size={20} />}
+                    color="#8A8A9E"
                   />
                 </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Shield, Power, ShieldAlert } from 'lucide-react';
+import { Save, Shield, ShieldAlert } from 'lucide-react';
 import type { MeterSettings } from '../lib/supabase';
 
 interface SettingsPanelProps {
@@ -13,7 +13,6 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
   const [minVoltage, setMinVoltage] = useState(180);
   const [maxVoltage, setMaxVoltage] = useState(260);
   const [maxPower, setMaxPower] = useState(3000);
-  const [relayState, setRelayState] = useState(true);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -23,7 +22,6 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
       setMinVoltage(settings.min_voltage);
       setMaxVoltage(settings.max_voltage);
       setMaxPower(settings.max_power);
-      setRelayState(settings.relay_state);
     }
   }, [settings, activeSensorId]);
 
@@ -33,7 +31,6 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
       min_voltage: minVoltage,
       max_voltage: maxVoltage,
       max_power: maxPower,
-      relay_state: relayState,
     });
     setSaving(false);
     if (success) {
@@ -62,28 +59,7 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
       </div>
 
       <div className="space-y-6">
-        {/* Relay State Toggle */}
-        <div className="p-4 rounded-lg border border-[#1A1A24] bg-[rgba(10,10,20,0.4)] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Power size={18} className={relayState ? "text-[#00FF9D]" : "text-[#FF0055]"} />
-            <div>
-              <div className="text-white text-sm font-semibold">Relay Switch</div>
-              <div className="text-[#6A6A7E] text-[10px]">Manually switch load ON or OFF</div>
-            </div>
-          </div>
-          <button
-            onClick={() => setRelayState(!relayState)}
-            className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-              relayState ? 'bg-[#00FF9D]' : 'bg-[#FF0055]'
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-[#050508] transform transition-transform duration-200 ${
-                relayState ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
+
 
         {/* Min Voltage */}
         <div>
