@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { supabase, MeterReading, MeterSettings } from '../lib/supabase';
 
 export interface EnergyData {
   voltage: number;
@@ -17,102 +18,151 @@ export interface EnergyData {
   timestamp: number;
 }
 
-function clamp(val: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, val));
-}
-
-function generateFluctuation(base: number, variance: number) {
-  return base + (Math.random() - 0.5) * variance * 2;
-}
-
 export function useEnergyData() {
-  const [data, setData] = useState<EnergyData>({
-    voltage: 226.4,
-    current: 4.82,
-    power: 1091.2,
-    energy: 15678.45,
-    energyToday: 12.34,
-    loadPercentage: 42.5,
-    powerFactor: 0.92,
-    frequency: 50.02,
-    temperature: 32.5,
-    humidity: 58.0,
-    relayStatus: 'active',
-    overloadThreshold: 80,
-    isOverloaded: false,
-    timestamp: Date.now(),
-  });
+  const [activeSensorId, setActiveSensorId] = useState<number>(1);
+  const [readingsMap, setReadingsMap] = useState<Record<number, MeterReading>>({});
+  const [settingsMap, setSettingsMap] = useState<Record<number, MeterSettings>>({});
+  const [historyList, setHistoryList] = useState<MeterReading[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const historyRef = useRef<{ voltage: number[]; current: number[]; power: number[]; timestamps: number[] }>({
-    voltage: [],
-    current: [],
-    power: [],
-    timestamps: [],
-  });
+  // Load settings and latest readings initially
+  const fetchData = useCallback(async () => {
+    const settings = await supabase.getSettings();
+    const settingsObj: Record<number, MeterSettings> = {};
+    settings.forEach(s => {
+      settingsObj[s.sensor_id] = s;
+    });
+    setSettingsMap(settingsObj);
 
-  const [history, setHistory] = useState(historyRef.current);
-
-  const setOverloadThreshold = useCallback((threshold: number) => {
-    setData(prev => ({ ...prev, overloadThreshold: clamp(threshold, 50, 100) }));
+    // Fetch latest reading for each of the 3 sensors
+    const newReadingsMap: Record<number, MeterReading> = {};
+    for (let id = 1; id <= 3; id++) {
+      const readings = await supabase.getReadings(id, 1);
+      if (readings.length > 0) {
+        newReadingsMap[id] = readings[0];
+      }
+    }
+    setReadingsMap(newReadingsMap);
+    setLoading(false);
   }, []);
 
-  const resetRelay = useCallback(() => {
-    setData(prev => ({ ...prev, relayStatus: 'active', isOverloaded: false }));
-  }, []);
+  // Fetch history for the active sensor
+  const fetchHistory = useCallback(async () => {
+    const readings = await supabase.getReadings(activeSensorId, 60);
+    setHistoryList(readings);
+  }, [activeSensorId]);
 
+  // Initial load
   useEffect(() => {
-    const interval = setInterval(() => {
-      setData(prev => {
-        const voltage = clamp(generateFluctuation(prev.voltage, 1.5), 210, 245);
-        const current = clamp(generateFluctuation(prev.current, 0.3), 0.1, 15);
-        const power = voltage * current * 0.92;
-        const newEnergy = prev.energy + power / 3600000;
-        const newEnergyToday = prev.energyToday + power / 3600000;
-        const loadPercentage = clamp((current / 10) * 100, 0, 100);
-        const powerFactor = clamp(generateFluctuation(prev.powerFactor, 0.02), 0.75, 1.0);
-        const frequency = clamp(generateFluctuation(prev.frequency, 0.05), 49.5, 50.5);
-        const temperature = clamp(generateFluctuation(prev.temperature, 0.5), 25, 60);
-        const humidity = clamp(generateFluctuation(prev.humidity, 1), 30, 90);
-        const isOverloaded = loadPercentage > prev.overloadThreshold;
-        const relayStatus = isOverloaded ? 'tripped' : prev.relayStatus === 'tripped' ? 'tripped' : 'active';
+    fetchData();
+  }, [fetchData]);
 
-        const newData: EnergyData = {
-          ...prev,
-          voltage: Math.round(voltage * 100) / 100,
-          current: Math.round(current * 100) / 100,
-          power: Math.round(power * 100) / 100,
-          energy: Math.round(newEnergy * 100) / 100,
-          energyToday: Math.round(newEnergyToday * 100) / 100,
-          loadPercentage: Math.round(loadPercentage * 10) / 10,
-          powerFactor: Math.round(powerFactor * 100) / 100,
-          frequency: Math.round(frequency * 100) / 100,
-          temperature: Math.round(temperature * 10) / 10,
-          humidity: Math.round(humidity * 10) / 10,
-          isOverloaded,
-          relayStatus,
-          timestamp: Date.now(),
-        };
+  // Fetch history when active sensor changes
+  useEffect(() => {
+    fetchHistory();
+  }, [activeSensorId, fetchHistory]);
 
-        historyRef.current.voltage.push(newData.voltage);
-        historyRef.current.current.push(newData.current);
-        historyRef.current.power.push(newData.power);
-        historyRef.current.timestamps.push(newData.timestamp);
+  // Polling for updates every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      // Polling latest readings
+      const newReadingsMap: Record<number, MeterReading> = { ...readingsMap };
+      let activeChanged = false;
 
-        if (historyRef.current.voltage.length > 60) {
-          historyRef.current.voltage.shift();
-          historyRef.current.current.shift();
-          historyRef.current.power.shift();
-          historyRef.current.timestamps.shift();
+      for (let id = 1; id <= 3; id++) {
+        const readings = await supabase.getReadings(id, 1);
+        if (readings.length > 0) {
+          const latest = readings[0];
+          // Check if it's newer than what we have
+          if (!newReadingsMap[id] || newReadingsMap[id].id !== latest.id) {
+            newReadingsMap[id] = latest;
+            if (id === activeSensorId) {
+              activeChanged = true;
+            }
+          }
         }
+      }
 
-        setHistory({ ...historyRef.current });
+      setReadingsMap(newReadingsMap);
 
-        return newData;
+      if (activeChanged) {
+        fetchHistory();
+      }
+
+      // Periodically refresh settings as well (in case changed from other source)
+      const settings = await supabase.getSettings();
+      const settingsObj: Record<number, MeterSettings> = {};
+      settings.forEach(s => {
+        settingsObj[s.sensor_id] = s;
       });
-    }, 1000);
+      setSettingsMap(settingsObj);
+    }, 3000);
 
     return () => clearInterval(interval);
+  }, [activeSensorId, readingsMap, fetchHistory]);
+
+  // Trigger settings updates
+  const updateSensorSettings = useCallback(async (sensorId: number, newSettings: Partial<Omit<MeterSettings, 'sensor_id'>>) => {
+    const success = await supabase.updateSettings(sensorId, newSettings);
+    if (success) {
+      setSettingsMap(prev => ({
+        ...prev,
+        [sensorId]: {
+          ...prev[sensorId],
+          ...newSettings,
+          sensor_id: sensorId
+        } as MeterSettings
+      }));
+    }
+    return success;
   }, []);
 
-  return { data, history, setOverloadThreshold, resetRelay };
+  // Reset relay (manual turn back ON / active)
+  const resetRelay = useCallback(async () => {
+    await updateSensorSettings(activeSensorId, { relay_state: true });
+  }, [activeSensorId, updateSensorSettings]);
+
+  // Map settings and readings for the active sensor
+  const activeReading = readingsMap[activeSensorId];
+  const activeSettings = settingsMap[activeSensorId];
+
+  // If no readings, generate a placeholder / loading state
+  const data: EnergyData = {
+    voltage: activeReading?.voltage ?? 0,
+    current: activeReading?.current ?? 0,
+    power: activeReading?.power ?? 0,
+    energy: activeReading?.energy ?? 0,
+    energyToday: activeReading?.energy ?? 0, // Using total accumulated energy
+    loadPercentage: activeReading && activeSettings ? Math.min(100, Math.round((activeReading.power / activeSettings.max_power) * 100)) : 0,
+    powerFactor: activeReading?.pf ?? 1.0,
+    frequency: activeReading?.frequency ?? 50.0,
+    temperature: 28.5 + (Math.random() - 0.5) * 0.4, // Small fluctuation for realism
+    humidity: 60.0 + (Math.random() - 0.5) * 1.0,
+    relayStatus: activeSettings?.relay_state ? 'active' : 'tripped',
+    overloadThreshold: activeSettings ? Math.round((activeSettings.max_power / 3000.0) * 100) : 100, // Map power to percentage for the UI slide
+    isOverloaded: activeReading && activeSettings ? activeReading.power > activeSettings.max_power : false,
+    timestamp: activeReading ? new Date(activeReading.created_at).getTime() : Date.now(),
+  };
+
+  // Map history list to charts format
+  const history = {
+    voltage: historyList.map(h => h.voltage),
+    current: historyList.map(h => h.current),
+    power: historyList.map(h => h.power),
+    timestamps: historyList.map(h => new Date(h.created_at).getTime()),
+  };
+
+  return {
+    data,
+    history,
+    loading,
+    activeSensorId,
+    setActiveSensorId,
+    settings: activeSettings,
+    allSettings: settingsMap,
+    allReadings: readingsMap,
+    resetRelay,
+    updateSensorSettings,
+    refreshData: fetchData
+  };
 }

@@ -4,8 +4,6 @@ import {
   Zap,
   Activity,
   Gauge,
-  Thermometer,
-  Droplets,
   Wifi,
   Clock,
   Battery,
@@ -26,7 +24,18 @@ import { useIsMobile } from './hooks/use-mobile';
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { data, history, setOverloadThreshold, resetRelay } = useEnergyData();
+  const { 
+    data, 
+    history, 
+    loading,
+    activeSensorId, 
+    setActiveSensorId, 
+    settings, 
+    allSettings, 
+    allReadings, 
+    resetRelay, 
+    updateSensorSettings 
+  } = useEnergyData();
   const isMobile = useIsMobile();
 
   const formatTime = (ts: number) => {
@@ -37,6 +46,16 @@ export default function App() {
       second: '2-digit',
     });
   };
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#050508]">
+        <div className="text-[#00F0FF] font-rajdhani text-lg uppercase tracking-widest animate-pulse">
+          Connecting to Smart Energy Database...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -125,7 +144,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-[#1A1A24] px-2 md:px-3 py-1 rounded-full">
               <Wifi size={12} className="md:size-[14px]" style={{ color: '#00FF9D' }} />
-              <span className="text-[#00FF9D] text-[10px] md:text-xs font-medium">Connected</span>
+              <span className="text-[#00FF9D] text-[10px] md:text-xs font-medium">Database Connected</span>
             </div>
             {!isMobile && (
               <div className="flex items-center gap-2">
@@ -150,7 +169,45 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Main Metrics Row - Grid that adapts to screen size */}
+                {/* 3-Channel Grid Switcher */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((id) => {
+                    const reading = allReadings[id];
+                    const setting = allSettings[id];
+                    const isActive = activeSensorId === id;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setActiveSensorId(id)}
+                        className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between h-[100px] cursor-pointer ${
+                          isActive 
+                            ? 'border-[#00F0FF] bg-[rgba(0,240,255,0.05)]' 
+                            : 'border-[#1A1A24] bg-[rgba(15,15,25,0.4)] hover:border-[rgba(0,240,255,0.2)]'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span className={`text-[10px] uppercase font-bold tracking-widest ${isActive ? 'text-[#00F0FF]' : 'text-[#8A8A9E]'}`}>
+                            Channel {id}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-[#8A8A9E]">{setting?.relay_state ? 'RELAY ON' : 'TRIPPED'}</span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${setting?.relay_state ? 'bg-[#00FF9D]' : 'bg-[#FF0055]'}`} />
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold font-mono text-white">
+                            {reading ? `${Math.round(reading.power)} W` : '0 W'}
+                          </div>
+                          <div className="text-[10px] text-[#8A8A9E] mt-1 font-mono">
+                            {reading ? `${reading.voltage.toFixed(1)}V | ${reading.current.toFixed(2)}A` : 'No readings received'}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Channel Metrics Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <MetricCard
                     label="Voltage"
@@ -184,10 +241,10 @@ export default function App() {
                   />
                 </div>
 
-                {/* Adaptive Grid for large screens, Stacks on mobile */}
+                {/* Adaptive Grid for charts and controls */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   
-                  {/* Protection & Monitor - Full width on mobile, 4 columns on large */}
+                  {/* Protection & Monitor */}
                   <div className="lg:col-span-4 flex flex-col gap-6 order-2 lg:order-1">
                     <div
                       className="rounded-xl p-5 border border-[#1A1A24]"
@@ -199,7 +256,7 @@ export default function App() {
                       <div className="flex items-center gap-2 mb-4">
                         <ShieldCheck size={18} className="text-[#00F0FF]" />
                         <h3 className="text-white font-rajdhani font-bold text-sm uppercase tracking-wider">
-                          Protection System
+                          Channel {activeSensorId} Protection Status
                         </h3>
                       </div>
                       <OverloadPanel data={data} onResetRelay={resetRelay} />
@@ -215,7 +272,7 @@ export default function App() {
                       <div className="flex items-center gap-2 mb-4">
                         <Activity size={18} className="text-[#FF00FF]" />
                         <h3 className="text-white font-rajdhani font-bold text-sm uppercase tracking-wider">
-                          Load Monitoring
+                          Channel {activeSensorId} Current Load
                         </h3>
                       </div>
                       <LoadMonitor
@@ -225,7 +282,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Charts - 5 columns on large */}
+                  {/* Charts */}
                   <div className="lg:col-span-5 flex flex-col gap-6 order-1 lg:order-2">
                     <div
                       className="rounded-xl border border-[#1A1A24] overflow-hidden"
@@ -237,7 +294,7 @@ export default function App() {
                         <div className="flex items-center gap-2">
                           <TrendingUp size={16} style={{ color: '#00F0FF' }} />
                           <span className="text-white text-xs font-bold font-rajdhani tracking-wider uppercase">
-                            Power Usage Trends
+                            Channel {activeSensorId} Usage Trends
                           </span>
                         </div>
                       </div>
@@ -268,7 +325,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Device Status & Info - 3 columns on large */}
+                  {/* Project Info & Status */}
                   <div className="lg:col-span-3 flex flex-col gap-6 order-3">
                     <div
                       className="rounded-xl p-5 border border-[#1A1A24]"
@@ -277,26 +334,24 @@ export default function App() {
                         backdropFilter: 'blur(8px)',
                       }}
                     >
-                      <div className="flex items-center gap-2 mb-4">
-                        <Thermometer size={18} className="text-[#FF8C00]" />
-                        <h3 className="text-white font-rajdhani font-bold text-sm uppercase tracking-wider">
-                          Device Status
-                        </h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Thermometer size={16} className="text-[#FF8C00]" />
-                            <span className="text-[#8A8A9E] text-xs">Temperature</span>
-                          </div>
-                          <span className="text-white font-mono">{data.temperature}°C</span>
+                      <h3 className="text-white font-rajdhani font-bold text-sm uppercase tracking-widest mb-3">
+                        System Setup
+                      </h3>
+                      <p className="text-[#8A8A9E] text-[11px] leading-relaxed mb-4">
+                        Real-time monitoring and automated protection system across 3 independent output channels.
+                      </p>
+                      <div className="space-y-3 font-mono text-[10px]">
+                        <div className="flex justify-between">
+                          <span className="text-[#6A6A7E]">PZEM #1:</span>
+                          <span className="text-[#00F0FF]">Pins G12/G14</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Droplets size={16} className="text-[#00BFFF]" />
-                            <span className="text-[#8A8A9E] text-xs">Humidity</span>
-                          </div>
-                          <span className="text-white font-mono">{data.humidity}%</span>
+                        <div className="flex justify-between">
+                          <span className="text-[#6A6A7E]">Relay #1:</span>
+                          <span className="text-[#00FF9D]">Pin G27</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#6A6A7E]">PZEM Serial:</span>
+                          <span className="text-[#FFD700]">Pins G15/G2</span>
                         </div>
                       </div>
                     </div>
@@ -309,19 +364,16 @@ export default function App() {
                       }}
                     >
                       <h3 className="text-white font-rajdhani font-bold text-sm uppercase tracking-widest mb-3">
-                        Project Info
+                        Diagnostics
                       </h3>
-                      <p className="text-[#8A8A9E] text-[11px] leading-relaxed mb-4">
-                        Real-time monitoring and automated overload protection system.
-                      </p>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]" />
-                          <span className="text-[#8A8A9E] text-[10px] uppercase font-bold">ESP32 Controller</span>
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#00FF9D]" />
+                          <span className="text-[#8A8A9E] text-[9px] uppercase font-bold">SQL Database Online</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#00FF9D]" />
-                          <span className="text-[#8A8A9E] text-[10px] uppercase font-bold">Relay Protection</span>
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]" />
+                          <span className="text-[#8A8A9E] text-[9px] uppercase font-bold">Auto Refresh Active</span>
                         </div>
                       </div>
                     </div>
@@ -334,15 +386,33 @@ export default function App() {
             {activeTab === 'settings' && (
               <motion.div
                 key="settings"
-                className="flex items-start justify-center md:pt-8 h-full"
+                className="flex flex-col items-center justify-start md:pt-4 h-full gap-6 w-full"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
+                {/* Channel Selector for Settings */}
+                <div className="flex bg-[#0A0A10] border border-[#1A1A24] p-1.5 rounded-lg">
+                  {[1, 2, 3].map((id) => (
+                    <button
+                      key={id}
+                      onClick={() => setActiveSensorId(id)}
+                      className={`px-6 py-2 rounded font-rajdhani text-xs font-bold uppercase tracking-widest transition-all cursor-pointer ${
+                        activeSensorId === id 
+                          ? 'bg-[#00F0FF] text-[#050508]' 
+                          : 'text-[#8A8A9E] hover:text-white'
+                      }`}
+                    >
+                      Channel {id} Settings
+                    </button>
+                  ))}
+                </div>
+
                 <SettingsPanel
-                  overloadThreshold={data.overloadThreshold}
-                  onSetThreshold={setOverloadThreshold}
+                  activeSensorId={activeSensorId}
+                  settings={settings}
+                  onUpdateSettings={updateSensorSettings}
                 />
               </motion.div>
             )}
@@ -350,7 +420,7 @@ export default function App() {
             {activeTab === 'analytics' && (
               <motion.div
                 key="analytics"
-                className="flex flex-col items-center justify-start h-full gap-6"
+                className="flex flex-col items-center justify-start h-full gap-6 w-full"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -363,20 +433,39 @@ export default function App() {
                     backdropFilter: 'blur(8px)',
                   }}
                 >
-                  <h2 className="font-rajdhani text-xl md:text-2xl font-bold text-white mb-6 tracking-widest text-center">
-                    SYSTEM ANALYTICS
-                  </h2>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="font-rajdhani text-xl md:text-2xl font-bold text-white tracking-widest uppercase">
+                      Channel {activeSensorId} Analytics
+                    </h2>
+                    {/* Settings Switcher for Analytics */}
+                    <div className="flex bg-[#0A0A10] border border-[#1A1A24] p-1 rounded-lg">
+                      {[1, 2, 3].map((id) => (
+                        <button
+                          key={id}
+                          onClick={() => setActiveSensorId(id)}
+                          className={`px-3 py-1.5 rounded font-rajdhani text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                            activeSensorId === id 
+                              ? 'bg-[#00F0FF] text-[#050508]' 
+                              : 'text-[#8A8A9E] hover:text-white'
+                          }`}
+                        >
+                          Ch {id}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
                     <div className="text-center p-3 md:p-5 rounded-lg border border-[#1A1A24] bg-[rgba(10,10,20,0.4)]">
                       <div className="text-[#4A4A5E] text-[9px] md:text-[10px] uppercase tracking-widest mb-1 md:mb-2">Peak Volts</div>
                       <div className="font-mono text-lg md:text-2xl text-[#00F0FF]">
-                        {Math.max(...history.voltage, 0).toFixed(1)}V
+                        {history.voltage.length > 0 ? Math.max(...history.voltage, 0).toFixed(1) : '0.0'}V
                       </div>
                     </div>
                     <div className="text-center p-3 md:p-5 rounded-lg border border-[#1A1A24] bg-[rgba(10,10,20,0.4)]">
                       <div className="text-[#4A4A5E] text-[9px] md:text-[10px] uppercase tracking-widest mb-1 md:mb-2">Peak Amps</div>
                       <div className="font-mono text-lg md:text-2xl text-[#FF00FF]">
-                        {Math.max(...history.current, 0).toFixed(2)}A
+                        {history.current.length > 0 ? Math.max(...history.current, 0).toFixed(2) : '0.00'}A
                       </div>
                     </div>
                     <div className="text-center p-3 md:p-5 rounded-lg border border-[#1A1A24] bg-[rgba(10,10,20,0.4)]">

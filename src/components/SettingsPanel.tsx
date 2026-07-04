@@ -1,27 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Server, RefreshCw } from 'lucide-react';
+import { Save, Shield, Power, ShieldAlert } from 'lucide-react';
+import { MeterSettings } from '../lib/supabase';
 
 interface SettingsPanelProps {
-  overloadThreshold: number;
-  onSetThreshold: (t: number) => void;
+  activeSensorId: number;
+  settings: MeterSettings | undefined;
+  onUpdateSettings: (sensorId: number, data: Partial<Omit<MeterSettings, 'sensor_id'>>) => Promise<boolean>;
 }
 
-export default function SettingsPanel({ overloadThreshold, onSetThreshold }: SettingsPanelProps) {
-  const [threshold, setThreshold] = useState(overloadThreshold);
-  const [endpoint, setEndpoint] = useState('http://192.168.1.100/api');
-  const [interval, setInterval] = useState(1000);
+export default function SettingsPanel({ activeSensorId, settings, onUpdateSettings }: SettingsPanelProps) {
+  const [minVoltage, setMinVoltage] = useState(180);
+  const [maxVoltage, setMaxVoltage] = useState(260);
+  const [maxPower, setMaxPower] = useState(3000);
+  const [relayState, setRelayState] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    onSetThreshold(threshold);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // Sync state with settings prop when it changes
+  useEffect(() => {
+    if (settings) {
+      setMinVoltage(settings.min_voltage);
+      setMaxVoltage(settings.max_voltage);
+      setMaxPower(settings.max_power);
+      setRelayState(settings.relay_state);
+    }
+  }, [settings, activeSensorId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const success = await onUpdateSettings(activeSensorId, {
+      min_voltage: minVoltage,
+      max_voltage: maxVoltage,
+      max_power: maxPower,
+      relay_state: relayState,
+    });
+    setSaving(false);
+    if (success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   return (
     <motion.div
-      className="rounded p-6 border border-[#1A1A24] max-w-lg"
+      className="rounded-xl p-6 border border-[#1A1A24] w-full max-w-lg"
       style={{
         background: 'rgba(15, 15, 25, 0.6)',
         backdropFilter: 'blur(8px)',
@@ -29,111 +52,152 @@ export default function SettingsPanel({ overloadThreshold, onSetThreshold }: Set
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <h3 className="font-rajdhani text-xl font-semibold text-white mb-6 tracking-wider">
-        ESP32 CONFIGURATION
-      </h3>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-rajdhani text-xl font-bold text-white tracking-widest uppercase">
+          Sensor {activeSensorId} Configuration
+        </h3>
+        <span className="text-[10px] uppercase font-bold tracking-widest bg-[rgba(0,240,255,0.1)] text-[#00F0FF] border border-[rgba(0,240,255,0.2)] px-2.5 py-1 rounded">
+          Channel {activeSensorId}
+        </span>
+      </div>
 
-      <div className="space-y-5">
-        {/* API Endpoint */}
-        <div>
-          <label className="text-[#4A4A5E] text-xs font-inter tracking-wider uppercase block mb-2">
-            ESP32 API Endpoint
-          </label>
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Server size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4A4A5E]" />
-              <input
-                type="text"
-                value={endpoint}
-                onChange={(e) => setEndpoint(e.target.value)}
-                className="w-full bg-[#0A0A10] border border-[#1A1A24] rounded py-2.5 pl-10 pr-3 text-sm font-mono text-white focus:outline-none focus:border-[rgba(0,240,255,0.3)] transition-colors"
-                placeholder="http://192.168.1.100/api"
-              />
+      <div className="space-y-6">
+        {/* Relay State Toggle */}
+        <div className="p-4 rounded-lg border border-[#1A1A24] bg-[rgba(10,10,20,0.4)] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Power size={18} className={relayState ? "text-[#00FF9D]" : "text-[#FF0055]"} />
+            <div>
+              <div className="text-white text-sm font-semibold">Relay Switch</div>
+              <div className="text-[#6A6A7E] text-[10px]">Manually switch load ON or OFF</div>
             </div>
-            <button
-              className="px-3 py-2.5 rounded border border-[#1A1A24] text-[#8A8A9E] hover:text-[#00F0FF] hover:border-[rgba(0,240,255,0.2)] transition-colors"
-            >
-              <RefreshCw size={16} />
-            </button>
+          </div>
+          <button
+            onClick={() => setRelayState(!relayState)}
+            className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+              relayState ? 'bg-[#00FF9D]' : 'bg-[#FF0055]'
+            }`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full bg-[#050508] transform transition-transform duration-200 ${
+                relayState ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Min Voltage */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-[#8A8A9E] text-xs font-inter tracking-wider uppercase">
+              Under-Voltage Threshold
+            </label>
+            <span className="font-mono text-xs text-[#00F0FF]">{minVoltage}V</span>
+          </div>
+          <input
+            type="range"
+            min={100}
+            max={220}
+            step={1}
+            value={minVoltage}
+            onChange={(e) => setMinVoltage(Number(e.target.value))}
+            className="w-full accent-[#00F0FF]"
+          />
+          <div className="flex justify-between text-[10px] text-[#4A4A5E] mt-1">
+            <span>100V</span>
+            <span>Recommended: 180V</span>
+            <span>220V</span>
           </div>
         </div>
 
-        {/* Update Interval */}
+        {/* Max Voltage */}
         <div>
-          <label className="text-[#4A4A5E] text-xs font-inter tracking-wider uppercase block mb-2">
-            Update Interval (ms)
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-[#8A8A9E] text-xs font-inter tracking-wider uppercase">
+              Over-Voltage Threshold
+            </label>
+            <span className="font-mono text-xs text-[#FF0055]">{maxVoltage}V</span>
+          </div>
+          <input
+            type="range"
+            min={220}
+            max={280}
+            step={1}
+            value={maxVoltage}
+            onChange={(e) => setMaxVoltage(Number(e.target.value))}
+            className="w-full accent-[#FF0055]"
+          />
+          <div className="flex justify-between text-[10px] text-[#4A4A5E] mt-1">
+            <span>220V</span>
+            <span>Recommended: 260V</span>
+            <span>280V</span>
+          </div>
+        </div>
+
+        {/* Max Power Limit */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-[#8A8A9E] text-xs font-inter tracking-wider uppercase">
+              Max Power Limit (Overload)
+            </label>
+            <span className="font-mono text-xs text-[#FFD700]">{maxPower} Watts</span>
+          </div>
           <input
             type="range"
             min={500}
-            max={5000}
+            max={10000}
             step={100}
-            value={interval}
-            onChange={(e) => setInterval(Number(e.target.value))}
-            className="w-full accent-[#00F0FF]"
+            value={maxPower}
+            onChange={(e) => setMaxPower(Number(e.target.value))}
+            className="w-full accent-[#FFD700]"
           />
-          <div className="flex justify-between mt-1">
-            <span className="text-[#4A4A5E] text-xs">500ms</span>
-            <span className="font-mono text-sm text-[#00F0FF]">{interval}ms</span>
-            <span className="text-[#4A4A5E] text-xs">5000ms</span>
+          <div className="flex justify-between text-[10px] text-[#4A4A5E] mt-1">
+            <span>500W</span>
+            <span>Recommended: 3000W</span>
+            <span>10kW</span>
           </div>
         </div>
 
-        {/* Overload Threshold */}
-        <div>
-          <label className="text-[#4A4A5E] text-xs font-inter tracking-wider uppercase block mb-2">
-            Overload Threshold (%)
-          </label>
-          <input
-            type="range"
-            min={50}
-            max={100}
-            step={1}
-            value={threshold}
-            onChange={(e) => setThreshold(Number(e.target.value))}
-            className="w-full"
-            style={{ accentColor: threshold > 85 ? '#FF003C' : threshold > 70 ? '#FFD700' : '#00F0FF' }}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-[#4A4A5E] text-xs">50%</span>
-            <span
-              className="font-mono text-sm"
-              style={{ color: threshold > 85 ? '#FF003C' : threshold > 70 ? '#FFD700' : '#00F0FF' }}
-            >
-              {threshold}%
-            </span>
-            <span className="text-[#4A4A5E] text-xs">100%</span>
+        {/* System Warnings Info */}
+        <div className="pt-4 border-t border-[#1A1A24] space-y-2">
+          <div className="flex items-start gap-2 text-[10px] text-[#8A8A9E]">
+            <Shield size={12} className="text-[#00F0FF] mt-0.5 shrink-0" />
+            <span>If voltage goes below {minVoltage}V or exceeds {maxVoltage}V, the ESP32 will auto-trip the relay.</span>
           </div>
-        </div>
-
-        {/* Connection Status */}
-        <div className="pt-4 border-t border-[#1A1A24]">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: '#00FF9D', boxShadow: '0 0 8px #00FF9D' }}
-            />
-            <span className="text-[#8A8A9E] text-sm">Simulated Data Mode</span>
-            <span className="text-[#4A4A5E] text-xs ml-auto font-mono">
-              Demo Stream
-            </span>
+          <div className="flex items-start gap-2 text-[10px] text-[#8A8A9E]">
+            <ShieldAlert size={12} className="text-[#FFD700] mt-0.5 shrink-0" />
+            <span>If active power exceeds {maxPower}W, an overload event is logged and power will be cut off.</span>
           </div>
         </div>
 
         {/* Save Button */}
         <motion.button
-          className="w-full py-3 px-4 rounded font-rajdhani font-semibold text-sm tracking-wider uppercase flex items-center justify-center gap-2"
+          disabled={saving}
+          className="w-full py-3 px-4 rounded font-rajdhani font-bold text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-all cursor-pointer"
           style={{
-            background: saved ? 'rgba(0, 255, 157, 0.15)' : 'rgba(0, 240, 255, 0.1)',
-            border: `1px solid ${saved ? 'rgba(0, 255, 157, 0.3)' : 'rgba(0, 240, 255, 0.2)'}`,
-            color: saved ? '#00FF9D' : '#00F0FF',
+            background: saved 
+              ? 'rgba(0, 255, 157, 0.15)' 
+              : saving 
+                ? 'rgba(255, 215, 0, 0.1)' 
+                : 'rgba(0, 240, 255, 0.1)',
+            border: `1px solid ${
+              saved 
+                ? 'rgba(0, 255, 157, 0.3)' 
+                : saving 
+                  ? 'rgba(255, 215, 0, 0.2)' 
+                  : 'rgba(0, 240, 255, 0.2)'
+            }`,
+            color: saved 
+              ? '#00FF9D' 
+              : saving 
+                ? '#FFD700' 
+                : '#00F0FF',
           }}
           onClick={handleSave}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
         >
           <Save size={16} />
-          {saved ? 'Saved Successfully' : 'Apply Settings'}
+          {saving ? 'Updating Database...' : saved ? 'Settings Saved' : 'Save Configuration'}
         </motion.button>
       </div>
     </motion.div>
