@@ -17,6 +17,7 @@ export interface EnergyData {
   overloadThreshold: number;
   isOverloaded: boolean;
   timestamp: number;
+  tripReason: 'overload' | 'undervoltage' | 'overvoltage' | 'none';
 }
 
 export function useEnergyData() {
@@ -143,6 +144,20 @@ export function useEnergyData() {
     deviceLastActiveMap[id] = r ? new Date(r.created_at).getTime() : 0;
   }
 
+  // Determine trip reason if relay is tripped
+  let tripReason: 'overload' | 'undervoltage' | 'overvoltage' | 'none' = 'none';
+  if (activeSettings && activeSettings.relay_state === false) {
+    if (activeReading) {
+      if (activeReading.voltage < activeSettings.min_voltage) {
+        tripReason = 'undervoltage';
+      } else if (activeReading.voltage > activeSettings.max_voltage) {
+        tripReason = 'overvoltage';
+      } else {
+        tripReason = 'overload';
+      }
+    }
+  }
+
   // If no readings, generate a placeholder / loading state
   const data: EnergyData = {
     voltage: activeReading?.voltage ?? 0,
@@ -159,6 +174,7 @@ export function useEnergyData() {
     overloadThreshold: activeSettings ? Math.round((activeSettings.max_power / 3000.0) * 100) : 100, // Map power to percentage for the UI slide
     isOverloaded: activeReading && activeSettings ? activeReading.power > activeSettings.max_power : false,
     timestamp: activeReading ? new Date(activeReading.created_at).getTime() : Date.now(),
+    tripReason,
   };
 
   // Map history list to charts format

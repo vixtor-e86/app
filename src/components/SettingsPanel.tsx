@@ -71,7 +71,7 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
           </div>
           <input
             type="range"
-            min={100}
+            min={0}
             max={220}
             step={1}
             value={minVoltage}
@@ -79,7 +79,7 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
             className="w-full accent-[#00F0FF]"
           />
           <div className="flex justify-between text-[10px] text-[#4A4A5E] mt-1">
-            <span>100V</span>
+            <span>0V</span>
             <span>Recommended: 180V</span>
             <span>220V</span>
           </div>
@@ -95,17 +95,17 @@ export default function SettingsPanel({ activeSensorId, settings, onUpdateSettin
           </div>
           <input
             type="range"
-            min={220}
-            max={280}
+            min={100}
+            max={300}
             step={1}
             value={maxVoltage}
             onChange={(e) => setMaxVoltage(Number(e.target.value))}
             className="w-full accent-[#FF0055]"
           />
           <div className="flex justify-between text-[10px] text-[#4A4A5E] mt-1">
-            <span>220V</span>
+            <span>100V</span>
             <span>Recommended: 260V</span>
-            <span>280V</span>
+            <span>300V</span>
           </div>
         </div>
 

@@ -10,7 +10,13 @@ interface OverloadPanelProps {
 export default function OverloadPanel({ data, onResetRelay }: OverloadPanelProps) {
   const isTripped = data.relayStatus === 'tripped';
   const statusColor = isTripped ? '#FF003C' : '#00FF9D';
-  const statusText = isTripped ? 'OVERLOAD TRIPPED' : 'SYSTEM ACTIVE';
+  const statusText = isTripped 
+    ? data.tripReason === 'undervoltage' 
+      ? 'UNDERVOLTAGE TRIPPED' 
+      : data.tripReason === 'overvoltage' 
+        ? 'OVERVOLTAGE TRIPPED' 
+        : 'OVERLOAD TRIPPED'
+    : 'SYSTEM ACTIVE';
 
   return (
     <motion.div
@@ -104,8 +110,12 @@ export default function OverloadPanel({ data, onResetRelay }: OverloadPanelProps
       <div className="mt-4 pt-4 border-t border-[#1A1A24]">
         <p className="text-[#4A4A5E] text-[10px] leading-relaxed italic">
           {isTripped 
-            ? "Safety relay has cut power because the load exceeded the set limit. Remove excess load before resetting." 
-            : "The system is monitoring power flow. If load exceeds the limit, the relay will automatically trip to protect the circuit."}
+            ? data.tripReason === 'undervoltage'
+              ? "Safety relay has cut power due to an under-voltage fault on the grid. Power will restore automatically when voltage stabilizes or click reset below."
+              : data.tripReason === 'overvoltage'
+                ? "Safety relay has cut power due to an over-voltage surge on the grid. Power will restore automatically when voltage stabilizes or click reset below."
+                : "Safety relay has cut power because the active power load exceeded the limit. Remove excess load and click reset below." 
+            : "The system is monitoring power flow. If voltage dips, surges, or load exceeds your limits, the relay will automatically trip to protect your appliances."}
         </p>
       </div>
     </motion.div>
