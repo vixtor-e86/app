@@ -127,6 +127,22 @@ export function useEnergyData() {
   const activeReading = readingsMap[activeSensorId];
   const activeSettings = settingsMap[activeSensorId];
 
+  // Helper to determine if a sensor is online (received data in the last 15 seconds)
+  const getIsOnline = (reading?: MeterReading) => {
+    if (!reading) return false;
+    const diff = Date.now() - new Date(reading.created_at).getTime();
+    return diff < 15000; // 15 seconds threshold
+  };
+
+  const deviceOnlineMap: Record<number, boolean> = {};
+  const deviceLastActiveMap: Record<number, number> = {};
+
+  for (let id = 1; id <= 3; id++) {
+    const r = readingsMap[id];
+    deviceOnlineMap[id] = getIsOnline(r);
+    deviceLastActiveMap[id] = r ? new Date(r.created_at).getTime() : 0;
+  }
+
   // If no readings, generate a placeholder / loading state
   const data: EnergyData = {
     voltage: activeReading?.voltage ?? 0,
@@ -162,6 +178,8 @@ export function useEnergyData() {
     settings: activeSettings,
     allSettings: settingsMap,
     allReadings: readingsMap,
+    deviceOnlineMap,
+    deviceLastActiveMap,
     resetRelay,
     updateSensorSettings,
     refreshData: fetchData

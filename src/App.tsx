@@ -33,6 +33,8 @@ export default function App() {
     settings, 
     allSettings, 
     allReadings, 
+    deviceOnlineMap,
+    deviceLastActiveMap,
     resetRelay, 
     updateSensorSettings 
   } = useEnergyData();
@@ -45,6 +47,18 @@ export default function App() {
       minute: '2-digit',
       second: '2-digit',
     });
+  };
+
+  const formatTimeAgo = (timestamp: number) => {
+    if (timestamp === 0) return 'Never';
+    const diffMs = Date.now() - timestamp;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 5) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    return `${diffHr}h ago`;
   };
 
   if (loading) {
@@ -142,10 +156,29 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#1A1A24] px-2 md:px-3 py-1 rounded-full">
-              <Wifi size={12} className="md:size-[14px]" style={{ color: '#00FF9D' }} />
-              <span className="text-[#00FF9D] text-[10px] md:text-xs font-medium">Database Connected</span>
+            {/* Database Status */}
+            <div className="flex items-center gap-1.5 bg-[#1A1A24] px-2 md:px-3 py-1 rounded-full">
+              <Wifi size={11} style={{ color: '#00FF9D' }} />
+              <span className="text-[#00FF9D] text-[10px] md:text-xs font-medium">DB Connected</span>
             </div>
+
+            {/* Device Online/Offline Status */}
+            <div className="flex items-center gap-1.5 bg-[#1A1A24] px-2 md:px-3 py-1 rounded-full">
+              <span 
+                className="w-1.5 h-1.5 rounded-full" 
+                style={{ 
+                  background: deviceOnlineMap[activeSensorId] ? '#00FF9D' : '#FF0055',
+                  boxShadow: deviceOnlineMap[activeSensorId] ? '0 0 6px #00FF9D' : '0 0 6px #FF0055' 
+                }} 
+              />
+              <span className={`text-[10px] md:text-xs font-medium ${deviceOnlineMap[activeSensorId] ? 'text-[#00FF9D]' : 'text-[#FF0055]'}`}>
+                {deviceOnlineMap[activeSensorId] ? 'Online' : 'Offline'}
+              </span>
+              <span className="text-[9px] text-[#6A6A7E] font-mono">
+                ({formatTimeAgo(deviceLastActiveMap[activeSensorId])})
+              </span>
+            </div>
+
             {!isMobile && (
               <div className="flex items-center gap-2">
                 <Clock size={14} style={{ color: '#8A8A9E' }} />
@@ -175,20 +208,31 @@ export default function App() {
                     const reading = allReadings[id];
                     const setting = allSettings[id];
                     const isActive = activeSensorId === id;
+                    const isOnline = deviceOnlineMap[id];
+                    const lastSeen = deviceLastActiveMap[id];
                     return (
                       <button
                         key={id}
                         onClick={() => setActiveSensorId(id)}
-                        className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between h-[100px] cursor-pointer ${
+                        className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between h-[110px] cursor-pointer ${
                           isActive 
                             ? 'border-[#00F0FF] bg-[rgba(0,240,255,0.05)]' 
                             : 'border-[#1A1A24] bg-[rgba(15,15,25,0.4)] hover:border-[rgba(0,240,255,0.2)]'
                         }`}
                       >
                         <div className="flex justify-between items-center w-full">
-                          <span className={`text-[10px] uppercase font-bold tracking-widest ${isActive ? 'text-[#00F0FF]' : 'text-[#8A8A9E]'}`}>
-                            Channel {id}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span 
+                              className="w-1.5 h-1.5 rounded-full" 
+                              style={{ 
+                                background: isOnline ? '#00FF9D' : '#FF0055',
+                                boxShadow: isOnline ? '0 0 6px #00FF9D' : '0 0 6px #FF0055' 
+                              }} 
+                            />
+                            <span className={`text-[10px] uppercase font-bold tracking-widest ${isActive ? 'text-[#00F0FF]' : 'text-[#8A8A9E]'}`}>
+                              Channel {id}
+                            </span>
+                          </div>
                           <span className="flex items-center gap-1.5">
                             <span className="text-[10px] text-[#8A8A9E]">{setting?.relay_state ? 'RELAY ON' : 'TRIPPED'}</span>
                             <span className={`w-2.5 h-2.5 rounded-full ${setting?.relay_state ? 'bg-[#00FF9D]' : 'bg-[#FF0055]'}`} />
@@ -198,8 +242,13 @@ export default function App() {
                           <div className="text-2xl font-bold font-mono text-white">
                             {reading ? `${Math.round(reading.power)} W` : '0 W'}
                           </div>
-                          <div className="text-[10px] text-[#8A8A9E] mt-1 font-mono">
-                            {reading ? `${reading.voltage.toFixed(1)}V | ${reading.current.toFixed(2)}A | ${reading.frequency.toFixed(1)}Hz` : 'No readings received'}
+                          <div className="text-[10px] text-[#8A8A9E] mt-1 font-mono flex justify-between w-full">
+                            <span>
+                              {reading ? `${reading.voltage.toFixed(1)}V | ${reading.current.toFixed(2)}A | ${reading.frequency.toFixed(1)}Hz` : 'Offline'}
+                            </span>
+                            <span className="text-[9px] text-[#5A5A6E]">
+                              Seen: {formatTimeAgo(lastSeen)}
+                            </span>
                           </div>
                         </div>
                       </button>
