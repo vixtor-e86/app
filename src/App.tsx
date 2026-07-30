@@ -18,10 +18,14 @@ import LoadMonitor from './components/LoadMonitor';
 import OverloadPanel from './components/OverloadPanel';
 import PowerHistoryChart from './components/PowerHistoryChart';
 import SettingsPanel from './components/SettingsPanel';
+import AuthModal from './components/AuthModal';
 import { useEnergyData } from './hooks/useEnergyData';
 import { useIsMobile } from './hooks/use-mobile';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => sessionStorage.getItem('smart_meter_auth') === 'true'
+  );
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { 
@@ -61,6 +65,15 @@ export default function App() {
     return `${diffHr}h ago`;
   };
 
+  const handleLock = () => {
+    sessionStorage.removeItem('smart_meter_auth');
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <AuthModal onAuthenticate={() => setIsAuthenticated(true)} />;
+  }
+
   if (loading) {
     return (
       <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#050508]">
@@ -92,7 +105,7 @@ export default function App() {
       {/* Sidebar - Desktop */}
       {!isMobile && (
         <div className="relative z-20">
-          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} onLockSession={handleLock} />
         </div>
       )}
 
@@ -120,6 +133,7 @@ export default function App() {
                     setActiveTab(tab);
                     setIsSidebarOpen(false);
                   }} 
+                  onLockSession={handleLock}
                 />
               </motion.div>
             </>

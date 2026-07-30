@@ -1,9 +1,10 @@
-import { LayoutDashboard, BarChart3, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, Zap, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onLockSession?: () => void;
 }
 
 const navItems = [
@@ -12,7 +13,7 @@ const navItems = [
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 
-export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, onLockSession }: SidebarProps) {
   return (
     <div
       className="w-[180px] h-full flex flex-col py-6 gap-2 z-10"
@@ -58,6 +59,15 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       </div>
 
       <div className="px-6 py-4 mt-auto border-t border-[#1A1A24]">
+        {onLockSession && (
+          <button
+            onClick={onLockSession}
+            className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[#FF0055] hover:bg-[rgba(255,0,85,0.1)] transition-colors text-[10px] font-bold uppercase tracking-widest mb-3"
+          >
+            <LogOut size={14} />
+            <span>Lock Terminal</span>
+          </button>
+        )}
         <div className="flex items-center gap-2 mb-2">
           <div
             className="w-2 h-2 rounded-full"
